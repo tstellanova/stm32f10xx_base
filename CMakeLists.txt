@@ -6,6 +6,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 add_definitions(-DSTM32F107xC)
 #add_definitions(-DSTM32F10X_CL)
+add_definitions(-mcpu=cortex-m3)
 
 
 include_directories(CMSIS/Include)
@@ -14,13 +15,7 @@ include_directories(inc)
 include_directories(STM32F1xx_HAL_Driver/Inc)
 
 set(SOURCE_FILES
-    CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
-    src/main.c
-    src/stm32f1xx_hal_msp.c
-    src/stm32f1xx_it.c
-    src/syscalls.c
-    src/system_stm32f1xx.c
-    startup/startup_stm32f107xc.s
+
     STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c
     STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc.c
     STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc_ex.c
@@ -64,7 +59,17 @@ set(SOURCE_FILES
     STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_wwdg.c
     STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_fsmc.c
     STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_sdmmc.c
-    STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c)
+    STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c
+
+    CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
+    src/main.c
+    src/stm32f1xx_hal_msp.c
+    src/stm32f1xx_it.c
+    src/syscalls.c
+    src/system_stm32f1xx.c
+
+#    startup/startup_stm32f107xc.s
+        )
 
 add_executable(stm32f10xx ${SOURCE_FILES})
 
