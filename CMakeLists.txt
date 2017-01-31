@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.6)
-project(stm32f10xx_base)
+project(stm32f10xx_base C ASM)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
@@ -7,12 +7,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 add_definitions(-DSTM32F107xC)
 #add_definitions(-DSTM32F10X_CL)
 add_definitions(-mcpu=cortex-m3)
+add_definitions(-DDEBUG )
 
 
 include_directories(CMSIS/Include)
 include_directories(CMSIS/Device/ST/STM32F1xx/Include)
 include_directories(inc)
 include_directories(STM32F1xx_HAL_Driver/Inc)
+include_directories(BSP/VIEWTOOL_F107)
 
 set(SOURCE_FILES
 
@@ -66,9 +68,11 @@ set(SOURCE_FILES
     src/stm32f1xx_it.c
     src/syscalls.c
     src/system_stm32f1xx.c
+        BSP/VIEWTOOL_F107/stm32f107_viewtool.c
 
     startup/startup_stm32f107xc.s
         )
+
 
 add_executable(stm32f10xx ${SOURCE_FILES})
 

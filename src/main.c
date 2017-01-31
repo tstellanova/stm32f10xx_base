@@ -37,7 +37,10 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include <stm32f1xx_hal_gpio.h>
+#include <stm32f1xx_hal_conf.h>
 #include "main.h"
+#include "stm32f107_viewtool.h"
 
 /** @addtogroup STM32F1xx_HAL_Examples
   * @{
@@ -67,6 +70,61 @@ static void Error_Handler(void);
 
 /* Private functions ---------------------------------------------------------*/
 
+
+static void GPIO_Configuration(void)
+{
+  GPIO_InitTypeDef GPIO_InitStructure = {0};
+
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_AFIO_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_CAN1_CLK_ENABLE();
+  __HAL_RCC_CAN2_CLK_ENABLE();
+  __HAL_AFIO_REMAP_CAN1_2(); //TODO verify
+
+
+  // Configure CAN1 RX pin
+  GPIO_InitStructure.Pin = GPIO_PIN_8 ;
+  GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStructure.Pull = GPIO_PULLUP;
+  GPIO_InitStructure.Speed =  GPIO_SPEED_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+  // Configure CAN1 pin: TX
+  GPIO_InitStructure.Pin = GPIO_PIN_9 ;
+  GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+  // Configure CAN2 RX pin
+  GPIO_InitStructure.Pin = GPIO_PIN_12 ;
+  GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStructure.Pull = GPIO_PULLUP;
+  GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+  // Configure CAN2 pin: TX
+  GPIO_InitStructure.Pin = GPIO_PIN_13 ;
+  GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStructure.Speed  = GPIO_SPEED_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+//  HAL_RCC_ClockConfig()
+
+//  RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOB | RCC_APB2Periph_GPIOC, ENABLE);
+/**
+ *  LED1 -> PA6 , LED2 -> PA7
+ */
+  GPIO_InitStructure.Pin  = GPIO_PIN_6 | GPIO_PIN_7 ;
+  GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+  BSP_LED_Init(LED1);
+  BSP_LED_Init(LED2);
+
+}
+
 /**
   * @brief  Main program
   * @param  None
@@ -88,6 +146,9 @@ int main(void)
 
   /* Configure the system clock to 72 MHz */
   SystemClock_Config();
+
+
+  GPIO_Configuration();
 
   /* Initialize BSP Led for LED_RED */
 //  BSP_LED_Init(LED_RED);
