@@ -47,6 +47,9 @@
   * @{
   */
 
+
+
+
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -107,6 +110,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
   */
 void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
 {
+  (void)huart; //TODO
   /*##-1- Reset peripherals ##################################################*/
   USARTx_FORCE_RESET();
   USARTx_RELEASE_RESET();
@@ -118,6 +122,26 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
   HAL_GPIO_DeInit(USARTx_RX_GPIO_PORT, USARTx_RX_PIN);
 
 }
+
+//   Init the low level hardware : GPIO, CLOCK, NVIC
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
+{
+  if(htim->Instance==TIM3) {
+//    HAL_NVIC_SetPriority(TIM3_IRQn, 1, 1);
+    HAL_NVIC_EnableIRQ(TIM3_IRQn);
+  }
+}
+
+
+void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef *htim)
+{
+  if(htim->Instance==TIM3) {
+    __HAL_RCC_TIM2_FORCE_RESET();
+    __HAL_RCC_TIM2_RELEASE_RESET();
+    HAL_NVIC_DisableIRQ(TIM3_IRQn);
+  }
+}
+
 
 /**
   * @}

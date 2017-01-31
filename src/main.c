@@ -39,8 +39,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include <stm32f1xx_hal_gpio.h>
 #include <stm32f1xx_hal_conf.h>
+#include <stm32f1xx_hal_tim.h>
+#include <stm32f1xx_hal_tim_ex.h>
 #include "main.h"
-#include "stm32f107_viewtool.h"
 
 /** @addtogroup STM32F1xx_HAL_Examples
   * @{
@@ -55,7 +56,13 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 /* UART handler declaration */
-UART_HandleTypeDef UartHandle;
+UART_HandleTypeDef _UART1_Handle;
+
+
+CAN_HandleTypeDef    _CAN1_Handle;
+
+TIM_HandleTypeDef  _Heartbeat_Handle = {0};
+
 
 /* Private function prototypes -----------------------------------------------*/
 #ifdef __GNUC__
@@ -125,6 +132,120 @@ static void GPIO_Configuration(void)
 
 }
 
+
+static void CAN_Config(void)
+{
+  CAN_FilterConfTypeDef  sFilterConfig;
+  static CanTxMsgTypeDef        TxMessage; //TODO unsafe?
+  static CanRxMsgTypeDef        RxMessage;
+
+  /*##-1- Configure the CAN peripheral #######################################*/
+  _CAN1_Handle.Instance = CAN1;
+  _CAN1_Handle.pTxMsg = &TxMessage;
+  _CAN1_Handle.pRxMsg = &RxMessage;
+
+  _CAN1_Handle.Init.TTCM = DISABLE;
+  _CAN1_Handle.Init.ABOM = DISABLE;
+  _CAN1_Handle.Init.AWUM = DISABLE;
+  _CAN1_Handle.Init.NART = DISABLE;
+  _CAN1_Handle.Init.RFLM = DISABLE;
+  _CAN1_Handle.Init.TXFP = DISABLE;
+  _CAN1_Handle.Init.Mode = CAN_MODE_NORMAL;
+  _CAN1_Handle.Init.SJW = CAN_SJW_1TQ;
+  _CAN1_Handle.Init.BS1 = CAN_BS1_6TQ;
+  _CAN1_Handle.Init.BS2 = CAN_BS2_8TQ;
+  _CAN1_Handle.Init.Prescaler = 2;
+
+  if (HAL_CAN_Init(&_CAN1_Handle) != HAL_OK) {
+    Error_Handler();
+  }
+
+  // ##-2- Configure the CAN Filter ###########################################
+  sFilterConfig.FilterNumber = 0;
+  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+  sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+  sFilterConfig.FilterIdHigh = 0x0000;
+  sFilterConfig.FilterIdLow = 0x0000;
+  sFilterConfig.FilterMaskIdHigh = 0x0000;
+  sFilterConfig.FilterMaskIdLow = 0x0000;
+  sFilterConfig.FilterFIFOAssignment = 0;
+  sFilterConfig.FilterActivation = ENABLE;
+  sFilterConfig.BankNumber = 14;
+
+  if (HAL_CAN_ConfigFilter(&_CAN1_Handle, &sFilterConfig) != HAL_OK) {
+    Error_Handler();
+  }
+
+  /*##-3- Configure Transmission process #####################################*/
+  _CAN1_Handle.pTxMsg->StdId = 0x321;
+  _CAN1_Handle.pTxMsg->ExtId = 0x01;
+  _CAN1_Handle.pTxMsg->RTR = CAN_RTR_DATA;
+  _CAN1_Handle.pTxMsg->IDE = CAN_ID_STD;
+  _CAN1_Handle.pTxMsg->DLC = 2;
+}
+
+void UART_Config(void)
+{
+  /*##-1- Configure the UART peripheral ######################################*/
+  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
+  /* UART configured as follows:
+      - Word Length = 8 Bits (7 data bit + 1 parity bit) : BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
+      - Stop Bit    = One Stop bit
+      - Parity      = ODD parity
+      - BaudRate    = 9600 baud
+      - Hardware flow control disabled (RTS and CTS signals) */
+  _UART1_Handle.Instance        = USARTx;
+
+  _UART1_Handle.Init.BaudRate   = 9600;
+  _UART1_Handle.Init.WordLength = UART_WORDLENGTH_8B;
+  _UART1_Handle.Init.StopBits   = UART_STOPBITS_1;
+  _UART1_Handle.Init.Parity     = UART_PARITY_ODD;
+  _UART1_Handle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  _UART1_Handle.Init.Mode       = UART_MODE_TX_RX;
+
+  if (HAL_UART_Init(&_UART1_Handle) != HAL_OK) {
+    Error_Handler();
+  }
+}
+
+
+void TIM3_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&_Heartbeat_Handle);
+}
+
+static void heartbeat_config(void)
+{
+  TIM_ClockConfigTypeDef sClockSourceConfig;
+  TIM_MasterConfigTypeDef sMasterConfig;
+
+  __HAL_RCC_TIM3_CLK_ENABLE();
+
+  _Heartbeat_Handle.Instance = TIM3;
+  _Heartbeat_Handle.Init.Prescaler = 1;
+  _Heartbeat_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
+  _Heartbeat_Handle.Init.Period = 1000;
+  _Heartbeat_Handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  _Heartbeat_Handle.Init.RepetitionCounter = 0;
+  //calls into HAL_TIM_Base_MspInit:
+  if (HAL_OK != HAL_TIM_Base_Init(&_Heartbeat_Handle)) {
+    Error_Handler();
+  }
+
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  HAL_TIM_ConfigClockSource(&_Heartbeat_Handle, &sClockSourceConfig);
+
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  HAL_TIMEx_MasterConfigSynchronization(&_Heartbeat_Handle, &sMasterConfig);
+
+  if (HAL_OK != HAL_TIM_Base_Start_IT(&_Heartbeat_Handle)) {
+    Error_Handler();
+  }
+}
+
+
+
 /**
   * @brief  Main program
   * @param  None
@@ -148,33 +269,21 @@ int main(void)
   SystemClock_Config();
 
 
+
+
   GPIO_Configuration();
 
-  /* Initialize BSP Led for LED_RED */
-//  BSP_LED_Init(LED_RED);
+  heartbeat_config();
 
-  /*##-1- Configure the UART peripheral ######################################*/
-  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
-  /* UART configured as follows:
-      - Word Length = 8 Bits (7 data bit + 1 parity bit) : BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
-      - Stop Bit    = One Stop bit
-      - Parity      = ODD parity
-      - BaudRate    = 9600 baud
-      - Hardware flow control disabled (RTS and CTS signals) */
-  UartHandle.Instance        = USARTx;
+//  UART_Config();
 
-  UartHandle.Init.BaudRate   = 9600;
-  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
-  UartHandle.Init.StopBits   = UART_STOPBITS_1;
-  UartHandle.Init.Parity     = UART_PARITY_ODD;
-  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
-  UartHandle.Init.Mode       = UART_MODE_TX_RX;
+  CAN_Config();
 
-  if (HAL_UART_Init(&UartHandle) != HAL_OK)
-  {
-    /* Initialization Error */
-    Error_Handler();
-  }
+
+  BSP_LED_Off(LED1);
+  BSP_LED_Off(LED2);
+
+  BSP_LED_On(LED1);
 
   /* Output a message on Hyperterminal using printf function */
   printf("\n\r UART Printf Example: retarget the C library printf function to the UART\n\r");
@@ -195,7 +304,7 @@ PUTCHAR_PROTOTYPE
 {
   /* Place your implementation of fputc here */
   /* e.g. write a character to the USART2 and Loop until the end of transmission */
-  HAL_UART_Transmit(&UartHandle, (uint8_t *)&ch, 1, 0xFFFF);
+  HAL_UART_Transmit(&_UART1_Handle, (uint8_t *)&ch, 1, 0xFFFF);
 
   return ch;
 }
@@ -259,6 +368,14 @@ void SystemClock_Config(void)
 }
 
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim == &_Heartbeat_Handle) {
+    BSP_LED_Toggle(LED2);
+  }
+}
+
+
 /**
   * @brief  This function is executed in case of error occurrence.
   * @param  None
@@ -266,8 +383,8 @@ void SystemClock_Config(void)
   */
 static void Error_Handler(void)
 {
-  /* Turn LED_RED on */
-//  BSP_LED_On(LED_RED);
+  BSP_LED_Off(LED1);
+  BSP_LED_On(LED2);
   while (1)
   {
   }
