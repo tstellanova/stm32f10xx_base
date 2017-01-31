@@ -127,7 +127,6 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
 void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
 {
   if(htim->Instance==TIM3) {
-//    HAL_NVIC_SetPriority(TIM3_IRQn, 1, 1);
     HAL_NVIC_EnableIRQ(TIM3_IRQn);
   }
 }
@@ -136,8 +135,8 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
 void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef *htim)
 {
   if(htim->Instance==TIM3) {
-    __HAL_RCC_TIM2_FORCE_RESET();
-    __HAL_RCC_TIM2_RELEASE_RESET();
+    __HAL_RCC_TIM3_FORCE_RESET();
+    __HAL_RCC_TIM3_RELEASE_RESET();
     HAL_NVIC_DisableIRQ(TIM3_IRQn);
   }
 }

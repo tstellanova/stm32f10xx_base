@@ -222,7 +222,7 @@ static void heartbeat_config(void)
   __HAL_RCC_TIM3_CLK_ENABLE();
 
   _Heartbeat_Handle.Instance = TIM3;
-  _Heartbeat_Handle.Init.Prescaler = 1;
+  _Heartbeat_Handle.Init.Prescaler = 16000000;
   _Heartbeat_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
   _Heartbeat_Handle.Init.Period = 1000;
   _Heartbeat_Handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
