@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.6)
-project(stm32f10xx)
+project(stm32f10xx_base)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
