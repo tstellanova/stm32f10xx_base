@@ -61,14 +61,13 @@ set(SOURCE_FILES
     STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_sdmmc.c
     STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_usb.c
 
-    CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
     src/main.c
     src/stm32f1xx_hal_msp.c
     src/stm32f1xx_it.c
     src/syscalls.c
     src/system_stm32f1xx.c
 
-#    startup/startup_stm32f107xc.s
+    startup/startup_stm32f107xc.s
         )
 
 add_executable(stm32f10xx ${SOURCE_FILES})

@@ -41,7 +41,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
-#include "stm3210c_eval.h"
+//#include "stm3210c_eval.h"
 #include "stdio.h"
 
 /* Exported types ------------------------------------------------------------*/

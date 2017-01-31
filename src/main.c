@@ -90,7 +90,7 @@ int main(void)
   SystemClock_Config();
 
   /* Initialize BSP Led for LED_RED */
-  BSP_LED_Init(LED_RED);
+//  BSP_LED_Init(LED_RED);
 
   /*##-1- Configure the UART peripheral ######################################*/
   /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
@@ -206,7 +206,7 @@ void SystemClock_Config(void)
 static void Error_Handler(void)
 {
   /* Turn LED_RED on */
-  BSP_LED_On(LED_RED);
+//  BSP_LED_On(LED_RED);
   while (1)
   {
   }
