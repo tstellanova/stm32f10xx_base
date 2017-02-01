@@ -36,6 +36,8 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include <stm32f1xx_hal_conf.h>
+#include <stm32f1xx_hal_can.h>
 #include "main.h"
 
 /** @addtogroup STM32F1xx_HAL_Examples
@@ -74,30 +76,32 @@ void HAL_UART_MspInit(UART_HandleTypeDef *huart)
   GPIO_InitTypeDef  GPIO_InitStruct;
   (void)huart; //TODO unused
 
-  /*##-1- Enable peripherals and GPIO Clocks #################################*/
-  /* Enable GPIO TX/RX clock */
-  USARTx_TX_GPIO_CLK_ENABLE();
-  USARTx_RX_GPIO_CLK_ENABLE();
+  if (huart->Instance == USARTx) {
+    /*##-1- Enable peripherals and GPIO Clocks #################################*/
+    /* Enable GPIO TX/RX clock */
+    USARTx_TX_GPIO_CLK_ENABLE();
+    USARTx_RX_GPIO_CLK_ENABLE();
 
-  __HAL_RCC_AFIO_CLK_ENABLE();
-  AFIO->MAPR |= AFIO_MAPR_USART2_REMAP;
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    AFIO->MAPR |= AFIO_MAPR_USART2_REMAP;
 
-  /* Enable USARTx clock */
-  USARTx_CLK_ENABLE();
+    /* Enable USARTx clock */
+    USARTx_CLK_ENABLE();
 
-  /*##-2- Configure peripheral GPIO ##########################################*/
-  /* UART TX GPIO pin configuration  */
-  GPIO_InitStruct.Pin       = USARTx_TX_PIN;
-  GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull      = GPIO_PULLUP;
-  GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_HIGH;
+    /*##-2- Configure peripheral GPIO ##########################################*/
+    /* UART TX GPIO pin configuration  */
+    GPIO_InitStruct.Pin = USARTx_TX_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 
-  HAL_GPIO_Init(USARTx_TX_GPIO_PORT, &GPIO_InitStruct);
+    HAL_GPIO_Init(USARTx_TX_GPIO_PORT, &GPIO_InitStruct);
 
-  /* UART RX GPIO pin configuration  */
-  GPIO_InitStruct.Pin = USARTx_RX_PIN;
+    /* UART RX GPIO pin configuration  */
+    GPIO_InitStruct.Pin = USARTx_RX_PIN;
 
-  HAL_GPIO_Init(USARTx_RX_GPIO_PORT, &GPIO_InitStruct);
+    HAL_GPIO_Init(USARTx_RX_GPIO_PORT, &GPIO_InitStruct);
+  }
 }
 
 /**
@@ -141,6 +145,80 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef *htim)
   }
 }
 
+
+
+/**
+  * @brief CAN MSP Initialization
+  *        This function configures the hardware resources used in this example:
+  *           - Peripheral's clock enable
+  *           - Peripheral's GPIO Configuration
+  *           - NVIC configuration for DMA interrupt request enable
+  * @param hcan: CAN handle pointer
+  * @retval None
+  */
+void HAL_CAN_MspInit(CAN_HandleTypeDef *hcan)
+{
+  GPIO_InitTypeDef gpioInit = {0};
+
+  if (CAN1 == hcan->Instance) {
+    //CAN1 sits on PB8 (RX)  / PB9 (TX)
+    // CAN1 Periph clock enable
+    __HAL_RCC_CAN1_CLK_ENABLE();
+    // associated GPIO clock enable
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    // Enable AFIO clock and Remap CAN1 PINs to PB8 and PB9
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    __HAL_AFIO_REMAP_CAN1_2();
+
+    // Configure peripheral GPIO
+
+    // Configure CAN1 RX pin
+    gpioInit.Pin = GPIO_PIN_8 ;
+    gpioInit.Mode = GPIO_MODE_INPUT;
+    gpioInit.Pull = GPIO_PULLUP;
+    gpioInit.Speed =  GPIO_SPEED_HIGH;
+    HAL_GPIO_Init(GPIOB, &gpioInit);
+
+    // Configure CAN1 TX pin
+    gpioInit.Pin = GPIO_PIN_9 ;
+    gpioInit.Mode = GPIO_MODE_AF_PP;
+    gpioInit.Speed = GPIO_SPEED_HIGH;
+    HAL_GPIO_Init(GPIOB, &gpioInit);
+
+    // Configure the NVIC
+    // NVIC configuration for CAN1 Reception complete interrupt
+    HAL_NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn,  1, 0);
+    HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
+
+  }
+  else if (CAN2 == hcan->Instance) { //TODO verify
+    //CAN2 sits on PB12 (RX)  / PB13 (TX)
+    // CAN2 Periph clock enable
+    __HAL_RCC_CAN2_CLK_ENABLE();
+    // associated GPIO clock enable
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    // Enable AFIO clock
+    __HAL_RCC_AFIO_CLK_ENABLE();
+
+    // Configure CAN2 RX pin
+    gpioInit.Pin = GPIO_PIN_12 ;
+    gpioInit.Mode = GPIO_MODE_INPUT;
+    gpioInit.Pull = GPIO_PULLUP;
+    gpioInit.Speed = GPIO_SPEED_HIGH;
+    HAL_GPIO_Init(GPIOB, &gpioInit);
+
+    // Configure CAN2 pin: TX
+    gpioInit.Pin = GPIO_PIN_13 ;
+    gpioInit.Mode = GPIO_MODE_AF_PP;
+    gpioInit.Speed  = GPIO_SPEED_HIGH;
+    HAL_GPIO_Init(GPIOB, &gpioInit);
+
+    HAL_NVIC_SetPriority(CAN2_RX0_IRQn,  1, 0);
+    HAL_NVIC_EnableIRQ(CAN2_RX0_IRQn);
+  }
+}
 
 /**
   * @}

@@ -17,7 +17,6 @@ include_directories(STM32F1xx_HAL_Driver/Inc)
 include_directories(BSP/VIEWTOOL_F107)
 
 set(SOURCE_FILES
-
     STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c
     STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc.c
     STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_adc_ex.c

@@ -38,6 +38,7 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include <stm32f1xx_hal_can.h>
 #include "main.h"
 #include "stm32f1xx_it.h"
 
@@ -53,6 +54,11 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+
+extern CAN_HandleTypeDef    _CAN1_Handle;
+extern CAN_HandleTypeDef    _CAN2_Handle;
+
+
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 
@@ -172,6 +178,27 @@ void SysTick_Handler(void)
 /*void PPP_IRQHandler(void)
 {
 }*/
+
+
+/**
+* @brief  This function handles CAN1 RX0 interrupt request.
+* @param  None
+* @retval None
+*/
+void CAN1_RX_IRQHandler(void)
+{
+  HAL_CAN_IRQHandler(&_CAN1_Handle);
+}
+
+void CAN2_RX_IRQHandler(void)
+{
+  HAL_CAN_IRQHandler(&_CAN2_Handle);
+}
+
+
+
+
+
 
 
 /**

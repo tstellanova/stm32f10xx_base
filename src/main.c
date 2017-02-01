@@ -1,67 +1,34 @@
-/**
-  ******************************************************************************
-  * @file    UART/UART_Printf/Src/main.c
-  * @author  MCD Application Team
-  * @version V1.4.0
-  * @date    29-April-2016
-  * @brief   This example shows how to retarget the C library printf function
-  *          to the UART.
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; COPYRIGHT(c) 2016 STMicroelectronics</center></h2>
-  *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
-  *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  *
-  ******************************************************************************
-  */
+
 
 /* Includes ------------------------------------------------------------------*/
 #include <stm32f1xx_hal_gpio.h>
 #include <stm32f1xx_hal_conf.h>
 #include <stm32f1xx_hal_tim.h>
 #include <stm32f1xx_hal_tim_ex.h>
+#include <stm32f1xx_hal_can.h>
+#include <string.h>
 #include "main.h"
 
-/** @addtogroup STM32F1xx_HAL_Examples
-  * @{
-  */
-
-/** @addtogroup UART_Printf
-  * @{
-  */
 
 /* Private typedef -----------------------------------------------------------*/
+
+typedef volatile struct node_state_t {
+    volatile uint8_t health;
+    volatile uint8_t mode;
+    volatile uint8_t sub_mode;
+    volatile uint32_t uptime;
+} node_state_t;
+
+
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-/* UART handler declaration */
-UART_HandleTypeDef _UART1_Handle;
 
-
-CAN_HandleTypeDef    _CAN1_Handle;
-
+UART_HandleTypeDef _DBGUART_Handle;
+CAN_HandleTypeDef  _CAN1_Handle;
 TIM_HandleTypeDef  _Heartbeat_Handle = {0};
+
+node_state_t _node_state = {0};
 
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,7 +40,7 @@ TIM_HandleTypeDef  _Heartbeat_Handle = {0};
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
 void SystemClock_Config(void);
-static void Error_Handler(void);
+static void Error_Handler(HAL_StatusTypeDef status);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -84,37 +51,8 @@ static void GPIO_Configuration(void)
 
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_AFIO_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_CAN1_CLK_ENABLE();
-  __HAL_RCC_CAN2_CLK_ENABLE();
-  __HAL_AFIO_REMAP_CAN1_2(); //TODO verify
 
 
-  // Configure CAN1 RX pin
-  GPIO_InitStructure.Pin = GPIO_PIN_8 ;
-  GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStructure.Pull = GPIO_PULLUP;
-  GPIO_InitStructure.Speed =  GPIO_SPEED_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-  // Configure CAN1 pin: TX
-  GPIO_InitStructure.Pin = GPIO_PIN_9 ;
-  GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-  // Configure CAN2 RX pin
-  GPIO_InitStructure.Pin = GPIO_PIN_12 ;
-  GPIO_InitStructure.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStructure.Pull = GPIO_PULLUP;
-  GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
-
-  // Configure CAN2 pin: TX
-  GPIO_InitStructure.Pin = GPIO_PIN_13 ;
-  GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStructure.Speed  = GPIO_SPEED_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
 
 //  HAL_RCC_ClockConfig()
 
@@ -135,8 +73,8 @@ static void GPIO_Configuration(void)
 
 static void CAN_Config(void)
 {
-  CAN_FilterConfTypeDef  sFilterConfig;
-  static CanTxMsgTypeDef        TxMessage; //TODO unsafe?
+//  CAN_FilterConfTypeDef  sFilterConfig;
+  static CanTxMsgTypeDef        TxMessage; //TODO check use of static here
   static CanRxMsgTypeDef        RxMessage;
 
   /*##-1- Configure the CAN peripheral #######################################*/
@@ -155,34 +93,33 @@ static void CAN_Config(void)
   _CAN1_Handle.Init.BS1 = CAN_BS1_6TQ;
   _CAN1_Handle.Init.BS2 = CAN_BS2_8TQ;
   _CAN1_Handle.Init.Prescaler = 2;
-
-  if (HAL_CAN_Init(&_CAN1_Handle) != HAL_OK) {
-    Error_Handler();
+  if (HAL_OK != HAL_CAN_Init(&_CAN1_Handle)) {
+    Error_Handler(HAL_ERROR);
   }
 
-  // ##-2- Configure the CAN Filter ###########################################
-  sFilterConfig.FilterNumber = 0;
-  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
-  sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-  sFilterConfig.FilterIdHigh = 0x0000;
-  sFilterConfig.FilterIdLow = 0x0000;
-  sFilterConfig.FilterMaskIdHigh = 0x0000;
-  sFilterConfig.FilterMaskIdLow = 0x0000;
-  sFilterConfig.FilterFIFOAssignment = 0;
-  sFilterConfig.FilterActivation = ENABLE;
-  sFilterConfig.BankNumber = 14;
+//  // Configure CAN acceptance filter
+//  sFilterConfig.FilterNumber = 0;
+//  sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+//  sFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+//  sFilterConfig.FilterIdHigh = 0x0000;
+//  sFilterConfig.FilterIdLow = 0x0000;
+//  sFilterConfig.FilterMaskIdHigh = 0x0000;
+//  sFilterConfig.FilterMaskIdLow = 0x0000;
+//  sFilterConfig.FilterFIFOAssignment = 0;
+//  sFilterConfig.FilterActivation = ENABLE;
+//  sFilterConfig.BankNumber = 14;
+//  if (HAL_OK != HAL_CAN_ConfigFilter(&_CAN1_Handle, &sFilterConfig)) {
+//    Error_Handler(HAL_ERROR);
+//  }
 
-  if (HAL_CAN_ConfigFilter(&_CAN1_Handle, &sFilterConfig) != HAL_OK) {
-    Error_Handler();
-  }
-
-  /*##-3- Configure Transmission process #####################################*/
+  // Configure CAN transmission process
   _CAN1_Handle.pTxMsg->StdId = 0x321;
   _CAN1_Handle.pTxMsg->ExtId = 0x01;
   _CAN1_Handle.pTxMsg->RTR = CAN_RTR_DATA;
-  _CAN1_Handle.pTxMsg->IDE = CAN_ID_STD;
+  _CAN1_Handle.pTxMsg->IDE = CAN_ID_EXT;
   _CAN1_Handle.pTxMsg->DLC = 2;
 }
+
 
 void UART_Config(void)
 {
@@ -194,25 +131,22 @@ void UART_Config(void)
       - Parity      = ODD parity
       - BaudRate    = 9600 baud
       - Hardware flow control disabled (RTS and CTS signals) */
-  _UART1_Handle.Instance        = USARTx;
+  _DBGUART_Handle.Instance        = USARTx;
 
-  _UART1_Handle.Init.BaudRate   = 9600;
-  _UART1_Handle.Init.WordLength = UART_WORDLENGTH_8B;
-  _UART1_Handle.Init.StopBits   = UART_STOPBITS_1;
-  _UART1_Handle.Init.Parity     = UART_PARITY_ODD;
-  _UART1_Handle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
-  _UART1_Handle.Init.Mode       = UART_MODE_TX_RX;
+  _DBGUART_Handle.Init.BaudRate   = 9600;
+  _DBGUART_Handle.Init.WordLength = UART_WORDLENGTH_8B;
+  _DBGUART_Handle.Init.StopBits   = UART_STOPBITS_1;
+  _DBGUART_Handle.Init.Parity     = UART_PARITY_ODD;
+  _DBGUART_Handle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  _DBGUART_Handle.Init.Mode       = UART_MODE_TX_RX;
 
-  if (HAL_UART_Init(&_UART1_Handle) != HAL_OK) {
-    Error_Handler();
+  if (HAL_UART_Init(&_DBGUART_Handle) != HAL_OK) {
+    Error_Handler(HAL_ERROR);
   }
 }
 
 
-void TIM3_IRQHandler(void)
-{
-  HAL_TIM_IRQHandler(&_Heartbeat_Handle);
-}
+
 
 static void heartbeat_config(void)
 {
@@ -222,14 +156,14 @@ static void heartbeat_config(void)
   __HAL_RCC_TIM3_CLK_ENABLE();
 
   _Heartbeat_Handle.Instance = TIM3;
-  _Heartbeat_Handle.Init.Prescaler = 16000000;
+  _Heartbeat_Handle.Init.Prescaler = 12500000;
   _Heartbeat_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
   _Heartbeat_Handle.Init.Period = 1000;
   _Heartbeat_Handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   _Heartbeat_Handle.Init.RepetitionCounter = 0;
   //calls into HAL_TIM_Base_MspInit:
   if (HAL_OK != HAL_TIM_Base_Init(&_Heartbeat_Handle)) {
-    Error_Handler();
+    Error_Handler(HAL_ERROR);
   }
 
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
@@ -240,12 +174,17 @@ static void heartbeat_config(void)
   HAL_TIMEx_MasterConfigSynchronization(&_Heartbeat_Handle, &sMasterConfig);
 
   if (HAL_OK != HAL_TIM_Base_Start_IT(&_Heartbeat_Handle)) {
-    Error_Handler();
+    Error_Handler(HAL_ERROR);
   }
 }
 
 
 
+static void sendNodeStatus()
+{
+//TODO implement
+
+}
 /**
   * @brief  Main program
   * @param  None
@@ -268,9 +207,6 @@ int main(void)
   /* Configure the system clock to 72 MHz */
   SystemClock_Config();
 
-
-
-
   GPIO_Configuration();
 
   heartbeat_config();
@@ -279,19 +215,19 @@ int main(void)
 
   CAN_Config();
 
-
   BSP_LED_Off(LED1);
   BSP_LED_Off(LED2);
-
   BSP_LED_On(LED1);
 
-  /* Output a message on Hyperterminal using printf function */
-  printf("\n\r UART Printf Example: retarget the C library printf function to the UART\n\r");
-  printf("** Test finished successfully. ** \n\r");
+  printf("\n\r startup \r\n");
+//  if (HAL_OK != HAL_CAN_Receive_IT(&_CAN1_Handle, CAN_FIFO0))  {
+//    Error_Handler(HAL_ERROR);
+//  }
 
-  /* Infinite loop */
-  while (1)
-  {
+  //send our NodeInfo over and over again
+  while (1) {
+    sendNodeStatus();
+    HAL_Delay(10);
   }
 }
 
@@ -304,7 +240,7 @@ PUTCHAR_PROTOTYPE
 {
   /* Place your implementation of fputc here */
   /* e.g. write a character to the USART2 and Loop until the end of transmission */
-  HAL_UART_Transmit(&_UART1_Handle, (uint8_t *)&ch, 1, 0xFFFF);
+  HAL_UART_Transmit(&_DBGUART_Handle, (uint8_t *)&ch, 1, 0xFFFF);
 
   return ch;
 }
@@ -347,10 +283,8 @@ void SystemClock_Config(void)
   oscinitstruct.PLL2.PLL2State        = RCC_PLL2_ON;
   oscinitstruct.PLL2.PLL2MUL          = RCC_PLL2_MUL8;
   oscinitstruct.PLL2.HSEPrediv2Value  = RCC_HSE_PREDIV2_DIV5;
-  if (HAL_RCC_OscConfig(&oscinitstruct)!= HAL_OK)
-  {
-    /* Initialization Error */
-    while(1);
+  if (HAL_OK !=  HAL_RCC_OscConfig(&oscinitstruct)) {
+    Error_Handler(HAL_ERROR);
   }
 
   /* Select PLL as system clock source and configure the HCLK, PCLK1 and PCLK2 
@@ -360,19 +294,39 @@ void SystemClock_Config(void)
   clkinitstruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   clkinitstruct.APB2CLKDivider = RCC_HCLK_DIV1;
   clkinitstruct.APB1CLKDivider = RCC_HCLK_DIV2;  
-  if (HAL_RCC_ClockConfig(&clkinitstruct, FLASH_LATENCY_2)!= HAL_OK)
-  {
-    /* Initialization Error */
-    while(1); 
+  if (HAL_OK != HAL_RCC_ClockConfig(&clkinitstruct, FLASH_LATENCY_2)) {
+    Error_Handler(HAL_ERROR);
   }
 }
 
 
+// Called by HAL_TIM_IRQHandler
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if (htim == &_Heartbeat_Handle) {
     BSP_LED_Toggle(LED2);
+    _node_state.uptime++;
   }
+}
+
+void TIM3_IRQHandler(void)
+{
+  //foward to HAL_TIM_PeriodElapsedCallback
+  HAL_TIM_IRQHandler(&_Heartbeat_Handle);
+}
+
+void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
+{
+  //TODO handle received data
+  if (CAN1 == hcan->Instance) {
+    //rearm receive
+
+    if (HAL_OK != HAL_CAN_Receive_IT(hcan, CAN_FIFO0) ) {
+      /* Reception Error */
+      Error_Handler(HAL_ERROR);
+    }
+  }
+  //TODO handle CAN2
 }
 
 
@@ -381,13 +335,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   * @param  None
   * @retval None
   */
-static void Error_Handler(void)
+static void Error_Handler(HAL_StatusTypeDef status)
 {
+  UNUSED(status);
+
   BSP_LED_Off(LED1);
   BSP_LED_On(LED2);
-  while (1)
-  {
-  }
+  while (1);
+
 }
 
 #ifdef  USE_FULL_ASSERT
@@ -418,4 +373,3 @@ void assert_failed(uint8_t *file, uint32_t line)
   * @}
   */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

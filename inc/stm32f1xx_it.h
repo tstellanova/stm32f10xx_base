@@ -58,6 +58,10 @@ void SVC_Handler(void);
 void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
+void CAN1_RX_IRQHandler(void);
+void CAN2_RX_IRQHandler(void);
+//TODO add tiemr handler?
+
 #ifdef __cplusplus
 }
 #endif
